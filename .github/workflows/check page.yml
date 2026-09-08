@@ -4,10 +4,17 @@ on:
   schedule:
     # Ogni 15 minuti (GitHub può ritardare leggermente in caso di carico,
     # ma per questo scopo va benissimo)
-    - cron: "*/15 * * * *" workflow_dispatch: {} repository_dispatch: types: [manual-check]
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}  # permette di lanciarlo anche a mano dalla tab "Actions"
+  repository_dispatch:
+    types: [manual-check]  # attivato da cron-job.org ogni 15 minuti
 
 permissions:
   contents: write
+
+concurrency:
+  group: page-monitor
+  cancel-in-progress: false
 
 jobs:
   check:
@@ -33,6 +40,7 @@ jobs:
           if [ -n "$(git status --porcelain state.txt)" ]; then
             git add state.txt
             git commit -m "Aggiorna stato: nuova data ultima modifica"
+            git pull --rebase origin main
             git push
           else
             echo "Nessun cambiamento di stato da salvare."
