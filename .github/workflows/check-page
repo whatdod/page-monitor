@@ -4,8 +4,7 @@ on:
   schedule:
     # Ogni 15 minuti (GitHub può ritardare leggermente in caso di carico,
     # ma per questo scopo va benissimo)
-    - cron: "*/15 * * * *"
-  workflow_dispatch: {}  # permette di lanciarlo anche a mano dalla tab "Actions"
+    - cron: "*/15 * * * *" workflow_dispatch: {} repository_dispatch: types: [manual-check]
 
 permissions:
   contents: write
