@@ -67,21 +67,11 @@ def write_state(value: str) -> None:
         f.write(value)
 
 
-def notify_teams(webhook_url: str, old_value: str | None, new_value: str) -> None:
-    if old_value is None:
-        text = (
-            f"✅ Monitoraggio avviato per il bando.\n\n"
-            f"Data ultima modifica rilevata: **{new_value}**\n\n"
-            f"{PAGE_URL}"
-        )
-    else:
-        text = (
-            f"🔔 La pagina del bando è stata modificata!\n\n"
-            f"Data ultima modifica: **{old_value} → {new_value}**\n\n"
-            f"{PAGE_URL}"
-        )
-
-    payload = {"text": text}
+def notify_teams(webhook_url: str) -> None:
+    # Il messaggio mostrato in Teams è ora testo fisso configurato
+    # direttamente nel flow di Power Automate. Qui basta inviare
+    # una richiesta POST qualsiasi per farlo scattare.
+    payload = {"triggered": True}
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         webhook_url,
@@ -118,7 +108,7 @@ def main() -> int:
 
     print(f"Modifica rilevata: {old_value} -> {new_value}. Invio notifica Teams...")
     try:
-        notify_teams(webhook_url, old_value, new_value)
+        notify_teams(webhook_url)
     except Exception as e:
         print(f"ERRORE durante l'invio a Teams: {e}", file=sys.stderr)
         # Anche se la notifica fallisce, aggiorno lo stato per non
