@@ -1,4 +1,4 @@
-name: Monitora pagina bando
+name: Monitora pagine
 
 on:
   schedule:
@@ -28,18 +28,20 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Esegui controllo pagina
+      - name: Esegui controllo pagine
         env:
-          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          TEAMS_WEBHOOK_TOSCANA: ${{ secrets.TEAMS_WEBHOOK_TOSCANA }}
+          # Aggiungi qui una riga per ogni nuova pagina, es:
+          # TEAMS_WEBHOOK_NOMESITO: ${{ secrets.TEAMS_WEBHOOK_NOMESITO }}
         run: python check_page.py
 
       - name: Salva lo stato (commit se cambiato)
         run: |
           git config user.name "page-monitor-bot"
           git config user.email "actions@github.com"
-          if [ -n "$(git status --porcelain state.txt)" ]; then
-            git add state.txt
-            git commit -m "Aggiorna stato: nuova data ultima modifica"
+          if [ -n "$(git status --porcelain state/)" ]; then
+            git add state/
+            git commit -m "Aggiorna stato pagine monitorate"
             git pull --rebase origin main
             git push
           else
