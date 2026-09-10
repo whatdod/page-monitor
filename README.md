@@ -1,66 +1,95 @@
-# Monitoraggio pagina bando → notifica Teams
+# Monitoraggio pagine → notifica Teams (versione multi-pagina)
 
-Sistema gratuito, senza server e senza consumo di token AI: uno script Python
-gira ogni 15 minuti su GitHub Actions e avvisa un canale Teams quando cambia
-la data di "Ultima modifica" della pagina del bando.
+## Cosa cambia rispetto a prima
 
-## 1. Crea il webhook su Teams (app Workflows)
+- Il vecchio `state.txt` (una sola pagina) è sostituito da una cartella
+  `state/` con un file per pagina.
+- Il vecchio secret `TEAMS_WEBHOOK_URL` è sostituito da un secret **per
+  pagina**, es. `TEAMS_WEBHOOK_TOSCANA`.
+- Ogni pagina ha il proprio flow Teams dedicato, con un messaggio fisso che
+  la identifica (niente più problemi di testo dinamico).
 
-I vecchi "Incoming Webhook" di Teams sono stati ritirati da Microsoft: oggi
-si usa l'app **Workflows**, integrata gratuitamente in Teams.
+## Migrazione dalla versione precedente
 
-1. Nel canale Teams dove vuoi ricevere le notifiche, clicca sui **tre puntini (...)**
-   accanto al nome del canale → **Workflows**.
-2. Cerca il template **"Post to a channel when a webhook request is received"**
-   (in italiano: "Registra nel canale quando viene ricevuta una richiesta webhook").
-3. Conferma team e canale, poi crea il flow.
-4. Copia l'**URL del webhook** che ti viene mostrato: lo userai al punto 3.
+1. Su GitHub, crea un nuovo secret `TEAMS_WEBHOOK_TOSCANA` con lo stesso
+   valore che aveva `TEAMS_WEBHOOK_URL` (copialo dal flow Teams esistente,
+   quello già funzionante). Puoi eliminare il vecchio secret dopo.
+2. Sostituisci nel repository i tre file: `check_page.py`,
+   `.github/workflows/check-page.yml`.
+3. Rinomina/sposta il vecchio `state.txt` in `state/bando-toscana.txt`
+   (oppure lascia che venga ricreato da zero al primo giro: verrà solo
+   inviato un messaggio "di inizializzazione" in più, non un problema).
 
-> Nota: il flow creato in automatico dal template posta genericamente il campo
-> di testo che riceve. Se vuoi personalizzare come appare il messaggio, apri il
-> flow in Power Automate ed edita l'azione "Post message in a chat or channel",
-> usando il contenuto dinamico proveniente dal corpo della richiesta (il campo
-> `text` che lo script invia).
+## Passare da chat 1:1 a gruppo Teams
 
-## 2. Crea un repository GitHub (gratuito)
+1. In Teams, apri (o crea) una chat di gruppo con la tua collega (in una
+   chat 1:1 esistente: "Aggiungi persone" per farla diventare di gruppo).
+2. Apri il flow Teams collegato alla pagina Toscana, sull'azione
+   "Posta messaggio in una chat o canale": cambia "Posta in" da "Chat con
+   il bot del flusso" a **"Chat di gruppo"**, poi seleziona il gruppo
+   appena creato.
+3. Se il bot non riesce a pubblicare nel gruppo (errore di permessi),
+   cambia anche "Posta come" da "Bot del flusso" a **"Utente"**: il
+   messaggio verrà pubblicato a nome tuo invece che del bot, ma funziona
+   in qualsiasi chat di cui sei membro senza bisogno che il bot vi sia
+   aggiunto.
+4. Salva e testa (vedi sotto).
 
-1. Vai su github.com, crea un nuovo repository (può essere privato).
-2. Carica in questo repository i 3 file di questo pacchetto, mantenendo la
-   struttura delle cartelle:
-   - `check_page.py`
-   - `.github/workflows/check-page.yml`
-   - `README.md` (questo file, opzionale)
+## Come aggiungere una nuova pagina da monitorare
 
-## 3. Configura il secret con l'URL del webhook
+1. **Teams**: duplica un flow esistente (o crea uno nuovo dal template
+   "Post to a channel when a webhook request is received", vedi il primo
+   README per i dettagli). Nell'azione di pubblicazione:
+   - "Posta in": "Chat di gruppo" → stesso gruppo di prima.
+   - Messaggio: testo fisso che indichi QUALE pagina è cambiata, es.
+     "🔔 La pagina di [nome sito] è stata aggiornata! [url]".
+   - Copia il nuovo URL del webhook (tab "Parametri" del trigger).
+2. **GitHub secret**: Settings → Secrets and variables → Actions → New
+   secret. Nome a piacere ma coerente, es. `TEAMS_WEBHOOK_NOMESITO`.
+   Valore: l'URL copiato al punto 1.
+3. **Workflow**: apri `.github/workflows/check-page.yml`, nella sezione
+   `env` dello step "Esegui controllo pagine" aggiungi una riga come:
+   ```yaml
+   TEAMS_WEBHOOK_NOMESITO: ${{ secrets.TEAMS_WEBHOOK_NOMESITO }}
+   ```
+4. **Script**: apri `check_page.py`, nella lista `PAGES` in cima al file
+   aggiungi una voce:
+   ```python
+   {
+       "name": "Nome del sito",
+       "url": "https://esempio.it/pagina-da-monitorare",
+       "state_file": "state/nome-sito.txt",
+       "webhook_env": "TEAMS_WEBHOOK_NOMESITO",
+   },
+   ```
+5. Commit, poi testa lanciando manualmente il workflow da GitHub Actions.
 
-1. Nel repository: **Settings → Secrets and variables → Actions → New repository secret**.
-2. Nome: `TEAMS_WEBHOOK_URL`
-3. Valore: l'URL copiato al punto 1.
-4. Salva.
+## Come funziona il rilevamento delle modifiche
 
-## 4. Attiva e testa
+Per ogni pagina, lo script prova in ordine:
+1. Il meta tag `article:modified_time` nell'HTML (il più robusto, usato da
+   molti siti istituzionali basati su WordPress/simili).
+2. Il testo visibile "Ultima modifica: DD.MM.YYYY".
+3. Se nessuno dei due è presente: un hash dell'intera pagina, che rileva
+   **qualsiasi** cambiamento nel contenuto HTML (utile per siti con
+   struttura sconosciuta, ma può generare qualche falso positivo se la
+   pagina contiene elementi che cambiano da soli, es. contatori visite,
+   pubblicità, timestamp automatici — in tal caso serve un pattern più
+   specifico, da valutare caso per caso quando si presenta il problema).
 
-1. Vai nella tab **Actions** del repository.
-2. Se richiesto, abilita i workflow ("I understand my workflows, go ahead and enable them").
-3. Apri il workflow **"Monitora pagina bando"** e clicca **Run workflow** per
-   testarlo manualmente subito (invece di aspettare i 15 minuti).
-4. La prima esecuzione registra la data corrente e ti manda un messaggio di
-   "monitoraggio avviato" — è normale, serve solo a inizializzare lo stato.
-   Dalla seconda esecuzione in poi arriverà una notifica solo se la data
-   di "Ultima modifica" è effettivamente cambiata.
+## Uso aziendale con account personali — attenzione
 
-Da quel momento in poi il controllo gira in automatico ogni 15 minuti, gratis,
-senza bisogno di lasciare accesi PC o server.
+Questo sistema, così com'è, gira su un account GitHub e un account
+cron-job.org personali. Prima di affidarci un processo di lavoro
+condiviso con colleghi, vale la pena verificare con l'IT/il responsabile
+se l'azienda preferisce che venga spostato su account/strumenti aziendali
+— così il sistema non dipende da un singolo account personale e resta
+accessibile anche se cambi ruolo o lasci l'azienda.
 
-## Note
+## Tutto il resto
 
-- **Costi**: GitHub Actions è gratuito fino a 2.000 minuti/mese sui repo privati
-  (illimitato sui repo pubblici). Con un controllo ogni 15 minuti (~96 volte
-  al giorno, pochi secondi ciascuno) si resta ben sotto quella soglia.
-- **Nessun token AI**: lo script fa solo un fetch HTTP e un confronto testuale,
-  nessuna chiamata a modelli di intelligenza artificiale.
-- **Affidabilità del cron**: GitHub non garantisce la precisione al minuto sui
-  cron job (può ritardare di qualche minuto nei momenti di carico sui server
-  condivisi), ma per questo scopo non è un problema.
-- Se in futuro Sviluppo Toscana cambia la struttura della pagina, la funzione
-  `extract_last_modified` nello script potrebbe dover essere aggiornata.
+Le istruzioni su cron-job.org (creazione del cronjob, token GitHub,
+`repository_dispatch`) restano identiche a quelle già configurate e
+funzionanti: non serve toccare nulla lì per aggiungere nuove pagine, dato
+che è lo stesso identico workflow GitHub a occuparsi di tutte le pagine
+nell'elenco `PAGES` ad ogni esecuzione.
