@@ -20,6 +20,7 @@ import os
 import re
 import sys
 import json
+import time
 import hashlib
 import urllib.request
 
@@ -33,12 +34,6 @@ PAGES = [
         "state_file": "state/bando-toscana.txt",
         "webhook_env": "TEAMS_WEBHOOK_TOSCANA",
     },
-   {
-      "name":"Bando MASE - amteriale di recupero",
-      "url":"https://www.mase.gov.it/portale/-/bando-credito-d-imposta-materiali-di-recupero-spese-annualita-2024-imminente-apertura-dello-sportello-per-la-presentazione-delle-istanze-",
-      "state_file": "state/bando-mase-materiali-recupero.txt", 
-      "webhook_env": "TEAMS_WEBHOOK_MASE", },
-   
     # Esempio per una prossima pagina (basta scommentare e adattare):
     # {
     #     "name": "Nome del sito",
@@ -60,12 +55,22 @@ META_PATTERN = re.compile(
     r'property=["\']article:modified_time["\']\s+content=["\']([^"\']+)["\']'
 )
 TEXT_PATTERN = re.compile(r"Ultima modifica:\s*([0-9]{2}\.[0-9]{2}\.[0-9]{4})")
+TEXT_PATTERN_MASE = re.compile(r"Ultimo aggiornamento\s*:?\s*([0-9]{2}\.[0-9]{2}\.[0-9]{4})")
 
 
-def fetch_page(url: str) -> str:
-    req = urllib.request.Request(url, headers=HEADERS)
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return resp.read().decode("utf-8", errors="ignore")
+def fetch_page(url: str, attempts: int = 3) -> str:
+    last_error = None
+    for i in range(attempts):
+        try:
+            req = urllib.request.Request(url, headers=HEADERS)
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                return resp.read().decode("utf-8", errors="ignore")
+        except Exception as e:
+            last_error = e
+            if i < attempts - 1:
+                print(f"  tentativo {i + 1}/{attempts} fallito ({e}), riprovo...", file=sys.stderr)
+                time.sleep(5)
+    raise last_error
 
 
 def extract_signature(html: str) -> str:
@@ -80,6 +85,10 @@ def extract_signature(html: str) -> str:
         return m.group(1).strip()
 
     m = TEXT_PATTERN.search(html)
+    if m:
+        return m.group(1).strip()
+
+    m = TEXT_PATTERN_MASE.search(html)
     if m:
         return m.group(1).strip()
 
