@@ -34,6 +34,7 @@ PAGES = [
         "state_file": "state/bando-toscana.txt",
         "webhook_env": "TEAMS_WEBHOOK_TOSCANA",
     },
+   { "name": "Bando MASE - materiale di recupero", "url": "https://www.mase.gov.it/portale/-/bando-credito-d-imposta-materiali-di-recupero-spese-annualita-2024-imminente-apertura-dello-sportello-per-la-presentazione-delle-istanze-", "state_file": "state/bando-mase-materiali-recupero.txt", "webhook_env": "TEAMS_WEBHOOK_MASE", },
     # Esempio per una prossima pagina (basta scommentare e adattare):
     # {
     #     "name": "Nome del sito",
